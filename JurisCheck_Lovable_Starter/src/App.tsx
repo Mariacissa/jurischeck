@@ -1,8 +1,11 @@
 import { useMemo, useState } from 'react';
-import { Scale, ShieldCheck, FileSearch, History, CreditCard, Settings, UploadCloud, FileText, AlertTriangle, CheckCircle2, CircleHelp, Clock3, ArrowUpRight, Menu, X, Sparkles, LockKeyhole, Search, Trash2, Download } from 'lucide-react';
+import { Scale, ShieldCheck, FileSearch, History, CreditCard, Settings, UploadCloud, FileText, AlertTriangle, CheckCircle2, CircleHelp, ArrowUpRight, Menu, X, Sparkles, LockKeyhole, Search, Download } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
+import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import mammoth from 'mammoth';
 import { supabase } from './lib/supabase';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 type Finding = {id:number;kind:string;reference:string;status:'Confirmada'|'Divergente'|'Não localizada'|'Atenção';risk:'Baixo'|'Médio'|'Alto';detail:string;action:string};
 type Review = {id:string;name:string;date:string;status:string;findings:Finding[];text:string};
@@ -16,7 +19,7 @@ function App(){
  const [page,setPage]=useState('Visão geral'); const [mobile,setMobile]=useState(false); const [file,setFile]=useState<File|null>(null); const [extract,setExtract]=useState(''); const [busy,setBusy]=useState(false); const [review,setReview]=useState<Review|null>(null); const [history,setHistory]=useState<Review[]>([]); const [query,setQuery]=useState('');
  const [notice,setNotice]=useState(''); const [showAuth,setShowAuth]=useState(false);
  const trialEnd=useMemo(()=>{const d=new Date();d.setDate(d.getDate()+7);return d.toLocaleDateString('pt-BR')},[]);
- async function readFile(f:File){setFile(f);setNotice('');try{if(f.type==='application/pdf'||f.name.toLowerCase().endsWith('.pdf')){const data=await f.arrayBuffer();const pdf=await pdfjsLib.getDocument({data}).promise;let all='';for(let i=1;i<=pdf.numPages;i++){const p=await pdf.getPage(i);const c=await p.getTextContent();all+=c.items.map((x:any)=>x.str||'').join(' ')+'\\n';}setExtract(all);}else if(f.name.toLowerCase().endsWith('.docx')){const r=await mammoth.extractRawText({arrayBuffer:await f.arrayBuffer()});setExtract(r.value);}else{setExtract(await f.text());}setNotice('Documento carregado e texto extraído localmente.');}catch{setExtract('');setNotice('Não foi possível extrair o texto. Tente um PDF pesquisável ou arquivo DOCX.');}}
+ async function readFile(f:File){setFile(f);setNotice('');try{if(f.type==='application/pdf'||f.name.toLowerCase().endsWith('.pdf')){const data=await f.arrayBuffer();const pdf=await pdfjsLib.getDocument({data}).promise;let all='';for(let i=1;i<=pdf.numPages;i++){const p=await pdf.getPage(i);const c=await p.getTextContent();all+=c.items.map((x:any)=>x.str||'').join(' ')+'\\n';}setExtract(all);}else if(f.name.toLowerCase().endsWith('.docx')){const r=await mammoth.extractRawText({arrayBuffer:await f.arrayBuffer()});setExtract(r.value);}else{setExtract(await f.text());}setNotice('Documento carregado e texto extraído localmente.');}catch(err){console.error('Falha ao extrair texto do documento:',err);setExtract('');setNotice('Não foi possível extrair o texto. Tente um PDF pesquisável ou arquivo DOCX.');}}
  async function runDemo(){if(!file||!extract.trim()){setNotice('Envie um PDF ou DOCX com texto selecionável.');return;}setBusy(true);await new Promise(r=>setTimeout(r,900));const item:Review={id:crypto.randomUUID(),name:file.name,date:new Date().toLocaleString('pt-BR'),status:'Demonstração — não validada',findings:demoFindings,text:extract};setReview(item);setHistory(h=>[item,...h]);setBusy(false);setPage('Relatório');}
  const nav=[['Visão geral',FileSearch],['Nova revisão',UploadCloud],['Histórico',History],['Planos',CreditCard],['Configurações',Settings]] as const;
  const filtered=history.filter(h=>h.name.toLowerCase().includes(query.toLowerCase()));
