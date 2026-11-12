@@ -9,6 +9,7 @@ export default defineConfig({
         manualChunks: {
           pdfjs: ['pdfjs-dist'],
           mammoth: ['mammoth'],
+          jspdf: ['jspdf'],
         },
       },
     },

@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Scale, ShieldCheck, FileSearch, History, CreditCard, Settings, UploadCloud, FileText, AlertTriangle, CheckCircle2, ArrowUpRight, Menu, X, Sparkles, LockKeyhole, Search, Download, LogOut, Loader2, MailCheck } from 'lucide-react';
+import { Scale, ShieldCheck, FileSearch, History, CreditCard, Settings, UploadCloud, FileText, AlertTriangle, CheckCircle2, ArrowUpRight, Menu, X, Sparkles, LockKeyhole, Search, Download, LogOut, Loader2, MailCheck, FileDown } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import mammoth from 'mammoth';
 import { supabase } from './lib/supabase';
 import { useAuth } from './lib/useAuth';
+import { exportReportPDF } from './lib/exportPDF';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
@@ -229,7 +230,7 @@ function App(){
    {page==='Relatório'&&review&&<>
      <div className="pageintro"><div className="eyebrow">RESULTADO DA REVISÃO</div><h1>Relatório de conferência</h1><p>{review.name} · {review.date}</p></div>
      <div className="notice danger"><AlertTriangle/><div><b>Relatório demonstrativo — não utilizar como parecer jurídico</b><span>Os status abaixo são exemplos de interface. Nenhuma fonte oficial foi consultada e nenhuma conclusão sobre autenticidade foi produzida.</span></div></div>
-     <div className="reporttop"><div><small>REFERÊNCIAS NO EXEMPLO</small><b>{review.findings.length}</b></div><div><small>CLASSIFICAÇÃO</small><b>Simulação</b></div><button className="secondary" onClick={()=>window.print()}><Download size={16}/> Imprimir relatório</button></div>
+     <div className="reporttop"><div><small>REFERÊNCIAS NO EXEMPLO</small><b>{review.findings.length}</b></div><div><small>CLASSIFICAÇÃO</small><b>Simulação</b></div><div className="report-actions"><button className="secondary" onClick={()=>exportReportPDF(review)}><FileDown size={16}/> Exportar PDF</button><button className="secondary" onClick={()=>window.print()}><Download size={16}/> Imprimir</button></div></div>
      {review.findings.map(f=><div className="finding" key={f.id}><div className="findinghead"><span className={`status ${f.status==='Não localizada'?'red':f.status==='Divergente'?'amber':'blue'}`}>{f.status}</span><span className={`risk ${f.risk.toLowerCase()}`}>Risco {f.risk}</span><small>{f.kind}</small></div><h3>{f.reference}</h3><p>{f.detail}</p><div className="action"><b>Próxima ação sugerida</b><span>{f.action}</span></div></div>)}
    </>}
 

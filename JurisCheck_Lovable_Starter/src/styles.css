@@ -16,4 +16,5 @@
 .switch-divider{width:1px;height:12px;background:#dce3ea;margin:0 6px}
 .reset-hint{text-align:center;font-size:9px;color:#a8b2bd;margin-top:10px}
 .spin{animation:spin .7s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
-@media(max-width:600px){.auth-prompt{flex-direction:column;text-align:center;gap:12px}.auth-prompt button{width:100%}}
+.report-actions{display:flex;gap:8px;margin-left:auto}
+@media(max-width:600px){.auth-prompt{flex-direction:column;text-align:center;gap:12px}.auth-prompt button{width:100%}.report-actions{margin-left:0;width:100%}.report-actions button{flex:1}}
