@@ -71,5 +71,18 @@ export function useAuth() {
     setProfile(null);
   }, []);
 
-  return { session, profile, loading, signUp, signIn, signOut, refreshProfile };
+  const resetPassword = useCallback(async (email: string) => {
+    if (!supabase) throw new Error('Supabase não configurado.');
+    const redirectTo = typeof window !== 'undefined' ? `${window.location.origin}/#reset` : undefined;
+    const { error } = await supabase.auth.resetPasswordForEmail(email, redirectTo ? { redirectTo } : undefined);
+    if (error) throw error;
+  }, []);
+
+  const updatePassword = useCallback(async (newPassword: string) => {
+    if (!supabase) throw new Error('Supabase não configurado.');
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) throw error;
+  }, []);
+
+  return { session, profile, loading, signUp, signIn, signOut, resetPassword, updatePassword, refreshProfile };
 }

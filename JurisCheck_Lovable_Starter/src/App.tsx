@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Scale, ShieldCheck, FileSearch, History, CreditCard, Settings, UploadCloud, FileText, AlertTriangle, CheckCircle2, ArrowUpRight, Menu, X, Sparkles, LockKeyhole, Search, Download, LogOut, Loader2 } from 'lucide-react';
+import { Scale, ShieldCheck, FileSearch, History, CreditCard, Settings, UploadCloud, FileText, AlertTriangle, CheckCircle2, ArrowUpRight, Menu, X, Sparkles, LockKeyhole, Search, Download, LogOut, Loader2, MailCheck } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import mammoth from 'mammoth';
@@ -20,19 +20,27 @@ const plans=[{name:'Semanal',price:'R$ 7,00',period:'/ 7 dias',desc:'Para uso po
 function initials(name:string|null, email:string){if(name&&name.trim())return name.trim().slice(0,2).toUpperCase();return email.slice(0,2).toUpperCase()}
 
 function App(){
- const { session, profile, loading, signUp, signIn, signOut } = useAuth();
+ const { session, profile, loading, signUp, signIn, signOut, resetPassword, updatePassword } = useAuth();
  const user = session?.user ?? null;
  const [page,setPage]=useState('Visão geral'); const [mobile,setMobile]=useState(false); const [file,setFile]=useState<File|null>(null); const [extract,setExtract]=useState(''); const [busy,setBusy]=useState(false); const [review,setReview]=useState<Review|null>(null); const [history,setHistory]=useState<Review[]>([]); const [query,setQuery]=useState('');
  const [notice,setNotice]=useState('');
- const [authMode,setAuthMode]=useState<'signin'|'signup'>('signin');
+ const [authMode,setAuthMode]=useState<'signin'|'signup'|'forgot'|'reset'>('signin');
  const [authOpen,setAuthOpen]=useState(false);
  const [authForm,setAuthForm]=useState({email:'',password:'',name:''});
  const [authBusy,setAuthBusy]=useState(false);
  const [authError,setAuthError]=useState('');
+ const [authSuccess,setAuthSuccess]=useState('');
+ const [resetEmail,setResetEmail]=useState('');
 
  const trialEnd=useMemo(()=>{const d=new Date();d.setDate(d.getDate()+7);return d.toLocaleDateString('pt-BR')},[]);
 
  const isLoggedIn = !!user;
+
+ useEffect(()=>{
+   if(typeof window!=='undefined'&&window.location.hash==='#reset'){
+     setAuthMode('reset');setAuthOpen(true);setAuthError('');setAuthSuccess('');
+   }
+ },[]);
 
  async function loadHistory() {
    if (!supabase || !user) return;
@@ -102,23 +110,40 @@ function App(){
 
  async function handleAuth(e:React.FormEvent){
    e.preventDefault();
-   setAuthError('');setAuthBusy(true);
+   setAuthError('');setAuthSuccess('');setAuthBusy(true);
    try{
      if(authMode==='signup'){
        if(authForm.name.trim().length<2){setAuthError('Informe seu nome completo.');setAuthBusy(false);return;}
        await signUp(authForm.email.trim(),authForm.password,authForm.name.trim());
        setNotice('Conta criada com sucesso. Você já está conectado.');
+       setAuthOpen(false);
+       setAuthForm({email:'',password:'',name:''});
+     }else if(authMode==='forgot'){
+       if(authForm.email.trim().length<5){setAuthError('Informe seu e-mail.');setAuthBusy(false);return;}
+       await resetPassword(authForm.email.trim());
+       setResetEmail(authForm.email.trim());
+       setAuthSuccess('E-mail de recuperação enviado. Verifique sua caixa de entrada.');
+       setAuthForm({email:'',password:'',name:''});
+     }else if(authMode==='reset'){
+       if(authForm.password.length<6){setAuthError('A senha deve ter pelo menos 6 caracteres.');setAuthBusy(false);return;}
+       await updatePassword(authForm.password);
+       setNotice('Senha redefinida com sucesso. Você já pode entrar normalmente.');
+       setAuthOpen(false);
+       setAuthMode('signin');
+       setAuthForm({email:'',password:'',name:''});
+       if(window.location.hash==='#reset') window.history.replaceState(null,'',window.location.pathname);
      }else{
        await signIn(authForm.email.trim(),authForm.password);
        setNotice('Login realizado com sucesso.');
+       setAuthOpen(false);
+       setAuthForm({email:'',password:'',name:''});
      }
-     setAuthOpen(false);
-     setAuthForm({email:'',password:'',name:''});
    }catch(err:any){
      const msg = err?.message ?? 'Erro inesperado';
      if(msg.includes('Invalid login credentials')) setAuthError('E-mail ou senha incorretos.');
      else if(msg.includes('already registered')) setAuthError('Este e-mail já está cadastrado. Tente entrar.');
      else if(msg.includes('Password should be at least')) setAuthError('A senha deve ter pelo menos 6 caracteres.');
+     else if(msg.includes('For security purposes')) setAuthError('Não é possível redefinir a senha agora. Tente novamente mais tarde.');
      else setAuthError(msg);
    }finally{setAuthBusy(false);}
  }
@@ -130,7 +155,7 @@ function App(){
    setNotice('Você saiu da sua conta.');
  }
 
- function openAuth(mode:'signin'|'signup'){setAuthMode(mode);setAuthOpen(true);setAuthError('');}
+ function openAuth(mode:'signin'|'signup'|'forgot'|'reset'){setAuthMode(mode);setAuthOpen(true);setAuthError('');setAuthSuccess('');}
 
  const nav=[['Visão geral',FileSearch],['Nova revisão',UploadCloud],['Histórico',History],['Planos',CreditCard],['Configurações',Settings]] as const;
  const filtered=history.filter(h=>h.name.toLowerCase().includes(query.toLowerCase()));
@@ -243,19 +268,34 @@ function App(){
    <div className="modal auth-modal" onClick={e=>e.stopPropagation()}>
      <button className="modalclose" onClick={()=>setAuthOpen(false)}><X/></button>
      <div className="brandmark"><Scale/></div>
-     <h2>{authMode==='signin'?'Entrar na sua conta':'Criar sua conta'}</h2>
-     <p>{authMode==='signin'?'Acesse seu histórico de revisões.':'Comece a salvar suas revisões gratuitamente.'}</p>
+     {authMode==='signin'&&<h2>Entrar na sua conta</h2>}
+     {authMode==='signup'&&<h2>Criar sua conta</h2>}
+     {authMode==='forgot'&&<h2>Recuperar senha</h2>}
+     {authMode==='reset'&&<h2>Redefinir senha</h2>}
+     {authMode==='signin'&&<p>Acesse seu histórico de revisões.</p>}
+     {authMode==='signup'&&<p>Comece a salvar suas revisões gratuitamente.</p>}
+     {authMode==='forgot'&&<p>Informe seu e-mail para receber o link de recuperação.</p>}
+     {authMode==='reset'&&<p>Defina sua nova senha para acessar sua conta.</p>}
      {authError&&<div className="auth-error"><AlertTriangle size={15}/> {authError}</div>}
+     {authSuccess&&<div className="auth-success"><MailCheck size={15}/> {authSuccess}</div>}
      <form className="auth-form" onSubmit={handleAuth}>
        {authMode==='signup'&&<input type="text" placeholder="Nome completo" value={authForm.name} onChange={e=>setAuthForm(f=>({...f,name:e.target.value}))} required autoComplete="name"/>}
-       <input type="email" placeholder="E-mail" value={authForm.email} onChange={e=>setAuthForm(f=>({...f,email:e.target.value}))} required autoComplete="email"/>
-       <input type="password" placeholder="Senha (mín. 6 caracteres)" value={authForm.password} onChange={e=>setAuthForm(f=>({...f,password:e.target.value}))} required autoComplete={authMode==='signin'?'current-password':'new-password'} minLength={6}/>
-       <button className="primary wide" type="submit" disabled={authBusy}>{authBusy?<><Loader2 size={16} className="spin"/> Aguarde...</>:authMode==='signin'?'Entrar':'Criar conta'}</button>
+       {(authMode==='signin'||authMode==='signup'||authMode==='forgot')&&<input type="email" placeholder="E-mail" value={authForm.email} onChange={e=>setAuthForm(f=>({...f,email:e.target.value}))} required autoComplete="email"/>}
+       {(authMode==='signin'||authMode==='signup'||authMode==='reset')&&<input type="password" placeholder={authMode==='reset'?'Nova senha (mín. 6 caracteres)':'Senha (mín. 6 caracteres)'} value={authForm.password} onChange={e=>setAuthForm(f=>({...f,password:e.target.value}))} required autoComplete={authMode==='signin'?'current-password':'new-password'} minLength={6}/>}
+       <button className="primary wide" type="submit" disabled={authBusy}>{authBusy?<><Loader2 size={16} className="spin"/> Aguarde...</>:<>{authMode==='signin'?'Entrar':authMode==='signup'?'Criar conta':authMode==='forgot'?'Enviar link de recuperação':'Salvar nova senha'}</>}</button>
      </form>
      <div className="auth-switch">
-       {authMode==='signin'?'Ainda não tem conta? ':'Já tem uma conta? '}
-       <button onClick={()=>{setAuthMode(authMode==='signin'?'signup':'signin');setAuthError('')}}>{authMode==='signin'?'Criar conta':'Entrar'}</button>
+       {authMode==='signin'&&<><button className="link-btn" onClick={()=>{setAuthMode('forgot');setAuthError('');setAuthSuccess('')}}>Esqueci minha senha</button><span className="switch-divider"/></>}
+       {authMode==='signin'&&'Ainda não tem conta? '}
+       {authMode==='signup'&&'Já tem uma conta? '}
+       {authMode==='forgot'&&'Lembrou sua senha? '}
+       {authMode==='reset'&&'Cancelar e voltar para login '}
+       {authMode==='signin'&&<button onClick={()=>{setAuthMode('signup');setAuthError('');setAuthSuccess('')}}>Criar conta</button>}
+       {authMode==='signup'&&<button onClick={()=>{setAuthMode('signin');setAuthError('');setAuthSuccess('')}}>Entrar</button>}
+       {authMode==='forgot'&&<button onClick={()=>{setAuthMode('signin');setAuthError('');setAuthSuccess('')}}>Entrar</button>}
+       {authMode==='reset'&&<button onClick={()=>{setAuthMode('signin');setAuthError('');setAuthSuccess('');setAuthOpen(false);if(window.location.hash==='#reset')window.history.replaceState(null,'',window.location.pathname)}}>Voltar</button>}
      </div>
+     {authMode==='forgot'&&resetEmail&&<p className="reset-hint">Se não receber em alguns minutos, verifique o spam ou tente novamente.</p>}
    </div>
  </div>}
  </div>;
